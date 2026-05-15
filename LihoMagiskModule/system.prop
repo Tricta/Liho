@@ -1,0 +1,8 @@
+dalvik.vm.usejit=false
+dalvik.vm.profilesystemserver=false
+dalvik.vm.profile.max-frames=0
+dalvik.vm.dex2oat-filter=interpret-only
+pm.dexopt.install=interpret-only
+pm.dexopt.bg-dexopt=interpret-only
+pm.dexopt.first-boot=interpret-only
+pm.dexopt.forced-dexopt=interpret-only

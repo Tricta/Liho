@@ -1,13 +1,12 @@
 #include "zygisk.hpp"
 #include "liho.h"
 #include "global.h"
-#include "logUtils.h"
+#include "Utils/logUtils.h"
 
 using zygisk::Api;
 using zygisk::AppSpecializeArgs;
 
-typedef int64_t (*NativeFunc)(char*);
-NativeFunc orig_nativeFunc = nullptr;
+int64_t (*orig_nativeFunc)(char*) = nullptr;
 
 class Liho : public zygisk::ModuleBase {
 public:
@@ -18,9 +17,10 @@ public:
 
     void postAppSpecialize(const AppSpecializeArgs *args) override {
         const char *packageNameChars = env->GetStringUTFChars(args->nice_name, nullptr);
-        const char* appDataDirChars  = env->GetStringUTFChars(args->app_data_dir, nullptr);
 
         set_apk_name("com.example.dummy3");
+        set_debug_enabled(true);
+        set_log_filter("com.example.dummy3");
 
         if (strcmp(packageNameChars, APK_NAME) == 0) {
             LOGI("find process: %s", APK_NAME);
@@ -35,7 +35,6 @@ public:
         }
 
         env->ReleaseStringUTFChars(args->nice_name, packageNameChars);
-        env->ReleaseStringUTFChars(args->app_data_dir, appDataDirChars);
     }
 
 private:

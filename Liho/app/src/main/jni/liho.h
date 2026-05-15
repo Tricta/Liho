@@ -1,6 +1,8 @@
+#pragma once
+
 #include <vector>
 
-#include "nativeHooking.h"
+#include "Hooking/nativeHooking.h"
 
 struct NativeHookTarget {
     const char* libName;
@@ -18,6 +20,8 @@ struct DexHookTarget {
 };
 
 extern const char* APK_NAME;
+extern bool DEBUG;
+extern std::string LOGFILTER;
 
 void register_native_hook(const char* libName, const char* symbolName, void* hookFunc, void** origFuncPtr);
 const std::vector<NativeHookTarget>& get_registered_native_hooks();
@@ -27,3 +31,5 @@ const std::vector<DexHookTarget>& get_registered_dex_hooks();
 
 void initialize_hooking_framework();
 void set_apk_name(const char* name);
+void set_debug_enabled(bool enabled);
+void set_log_filter(const std::string& filter);

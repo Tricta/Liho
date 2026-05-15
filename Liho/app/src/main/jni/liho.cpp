@@ -1,15 +1,20 @@
 #include "liho.h"
 
 #include "global.h"
-#include "artMethodHooking.h"
-#include "libartHook.h"
+#include "Hooking/artHooking.h"
 #include "dobby/dobby.h"
-#include "logUtils.h"
-#include "global.h"
+#include "Utils/logUtils.h"
+#include <cstdio>
+#include <cstring>
 
 const char* APK_NAME = nullptr;
+bool DEBUG = false;
+std::string LOGFILTER;
+
 static std::vector<DexHookTarget> registeredDexHooks;
 static std::vector<NativeHookTarget> registeredNativeHooks;
+
+ArtOrigs g_orig;
 
 void register_dex_hook(const char* targetMethod, const char* newClass, const char* newMethod, const char* newSig, const char* dexFile) {
     registeredDexHooks.push_back(DexHookTarget{targetMethod,newClass,newMethod,newSig,dexFile});
@@ -31,49 +36,88 @@ void set_apk_name(const char* name) {
     APK_NAME = name;
 }
 
+void set_debug_enabled(bool enabled) {
+    DEBUG = enabled;
+}
+
+void set_log_filter(const std::string& filter) {
+    LOGFILTER = filter;
+}
+
+static std::string find_lib_path(const char* libname) {
+    FILE* fp = fopen("/proc/self/maps", "r");
+    if (!fp) return "";
+    char line[512], path[256];
+    while (fgets(line, sizeof(line), fp)) {
+        path[0] = '\0';
+        if (sscanf(line, "%*lx-%*lx %*s %*s %*s %*s %255s", path) < 1) continue;
+        const char* p = strrchr(path, '/');
+        if (p && strstr(p + 1, libname)) {
+            fclose(fp);
+            return path;
+        }
+    }
+    fclose(fp);
+    return "";
+}
+
 void initialize_hooking_framework() {
     if (!registeredDexHooks.empty()) {
-        unsigned long int PrettyMethodAddr;
-
-        if (find_name("_ZN3art9ArtMethod12PrettyMethodEPS0_b", "libart.so", &PrettyMethodAddr) <
-            0) {
-            LOGI("can't find: _ZN3art9ArtMethod12PrettyMethodEPS0_b");
+        std::string libart_path = find_lib_path("libart.so");
+        if (libart_path.empty()) {
+            LOGE("libart.so not found in /proc/self/maps");
             return;
         }
 
-        if (DobbyHook((void *) PrettyMethodAddr, (void *) PrettyMethod,
-                      (void **) &orig_PrettyMethod) != 0) {
-            LOGE("PrettyMethod hook failed.");
-        }
-
-        char *doCallSymbols[4] = {
-                "_ZN3art11interpreter6DoCallILb0ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
-                "_ZN3art11interpreter6DoCallILb0ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
-                "_ZN3art11interpreter6DoCallILb1ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
-                "_ZN3art11interpreter6DoCallILb1ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE"
+        auto sym = [&](const char *name) -> void * {
+            void *s = DobbySymbolResolver(libart_path.c_str(), name);
+            if (!s) LOGE("cannot find symbol %s", name);
+            return s;
         };
 
-        void *trampolines[] = {(void *) hooked_doCall_0, (void *) hooked_doCall_1,
-                               (void *) hooked_doCall_2, (void *) hooked_doCall_3};
+        void *prettyMethodSym = sym("_ZN3art9ArtMethod12PrettyMethodEPS0_b");
+        if (!prettyMethodSym) return;
+        g_orig.PrettyMethod = (PrettyMethod_fn)prettyMethodSym;
+
+        void *invokeSym = sym("_ZN3art9ArtMethod6InvokeEPNS_6ThreadEPjjPNS_6JValueEPKc");
+        if (!invokeSym) return;
+        if (DobbyHook(invokeSym, (void *)hooked_Invoke, (void **)&g_orig.Invoke) != 0)
+            LOGE("Invoke hook failed.");
+
+        void *quickToInterpSym = sym("artQuickToInterpreterBridge");
+        if (!quickToInterpSym) return;
+        if (DobbyHook(quickToInterpSym, (void *)hook_artQuickToInterpreterBridge, (void **)&g_orig.artQuickToInterpreterBridge) != 0)
+            LOGE("quickToInterpreterAddr hook failed.");
+
+        void *fastInterpToInterpInvokeSym = sym("_ZN3art11interpreter37UseFastInterpreterToInterpreterInvokeEPNS_9ArtMethodE");
+        if (!fastInterpToInterpInvokeSym) return;
+        if (DobbyHook(fastInterpToInterpInvokeSym, (void *)hook_fastInterpToInterpInvoke, (void **)&g_orig.fastInterpToInterpInvoke) != 0)
+            LOGE("fastInterpToInterpInvoke hook failed.");
+
+        const char *doCallSymbols[4] = {
+            "_ZN3art11interpreter6DoCallILb0ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
+            "_ZN3art11interpreter6DoCallILb0ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
+            "_ZN3art11interpreter6DoCallILb1ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
+            "_ZN3art11interpreter6DoCallILb1ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE"
+        };
+        void *trampolines[4] = {
+            (void *)hooked_doCall_0, (void *)hooked_doCall_1,
+            (void *)hooked_doCall_2, (void *)hooked_doCall_3
+        };
 
         for (int i = 0; i < 4; ++i) {
-            unsigned long int doCallAddr;
-            if (find_name(doCallSymbols[i], "libart.so", &doCallAddr) < 0) {
-                LOGI("can't find: %s", doCallSymbols[i]);
-            }
-
-            if (DobbyHook((void *) doCallAddr, trampolines[i], (void **) &orig_doCall[i]) != 0) {
+            void *doCallSym = sym(doCallSymbols[i]);
+            if (!doCallSym) continue;
+            if (DobbyHook(doCallSym, trampolines[i], (void **)&g_orig.doCall[i]) != 0)
                 LOGE("doCall hook failed for: %s", doCallSymbols[i]);
-            }
         }
     }
 
     if (!registeredNativeHooks.empty()) {
         void *sym = DobbySymbolResolver(nullptr, "android_dlopen_ext");
         if (sym) {
-            if (DobbyHook(sym, (void *) hooked_android_dlopen_ext,(void **) &orig_android_dlopen_ext) != 0) {
+            if (DobbyHook(sym, (void *)hooked_android_dlopen_ext, (void **)&orig_android_dlopen_ext) != 0)
                 LOGE("Failed to hook android_dlopen_ext");
-            }
         } else {
             LOGE("Failed to resolve android_dlopen_ext symbol");
         }
