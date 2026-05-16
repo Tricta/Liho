@@ -28,8 +28,12 @@ public:
                 this->env->GetJavaVM(&g_vm);
             }
 
-            register_dex_hook("com.example.dummy3.MainActivity.isRoot", "com.example.dummy3.mydex", "isRoot", "()Ljava/lang/Boolean;","mydex.dex");
-            register_native_hook("libdummy3.so", "Java_com_example_dummy3_MainActivity_stringFromNativeCode", (void*)hooked_nativeFunc, (void**)&orig_nativeFunc);
+            register_dex_hook("com.example.dummy3.MainActivity.isRoot", 
+                "com.example.dummy3.mydex", "isRoot", "()Ljava/lang/Boolean;","mydex.dex");
+
+            register_native_hook("libdummy3.so",
+                "Java_com_example_dummy3_MainActivity_stringFromNativeCode", 
+                (void*)hooked_nativeFunc, (void**)&orig_nativeFunc);
 
             initialize_hooking_framework();
         }

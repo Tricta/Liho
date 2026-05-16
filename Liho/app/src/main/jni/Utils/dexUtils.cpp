@@ -102,7 +102,8 @@ std::vector<jclass> parseParamTypes(JNIEnv* env, const std::string& sig) {
 
 jobject getMethodObject(JNIEnv* env, jclass clazz, const char* methodName, const char* methodSig) {
     jclass classClass = env->FindClass("java/lang/Class");
-    jmethodID getMethod = env->GetMethodID(classClass, "getDeclaredMethod", "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;");
+    jmethodID getMethod = env->GetMethodID(classClass, "getDeclaredMethod", 
+        "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;");
 
     jstring nameStr = env->NewStringUTF(methodName);
 

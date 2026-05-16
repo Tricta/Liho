@@ -37,8 +37,7 @@ static void* maybe_patch(void* method) {
 
 static void trace_patch_frames(void* shadow_frame, void* callee) {
     std::vector<void*> frames;
-    for (void* frame = shadow_frame; frame;
-         frame = *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(frame))) {
+    for (void* frame = shadow_frame; frame; frame = *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(frame))) {
         void* method = *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(frame) + sizeof(void*));
         if (method) frames.push_back(method);
     }
@@ -51,9 +50,7 @@ static void trace_patch_frames(void* shadow_frame, void* callee) {
 
     std::string callee_pretty = callee ? g_orig.PrettyMethod(callee, 0) : "";
 
-    bool do_log = should_log(callee_pretty);
-
-    if (do_log) {
+    if (should_log(callee_pretty)) {
         LOGI("[DoCall] ┐");
         for (size_t i = 0; i < frame_names.size(); i++) {
             std::string indent(i * 2, ' ');

@@ -14,6 +14,8 @@ cleanup() {
             log "Deleted $dir"
         fi
     done
+    pm compile --reset "$PKG" >/dev/null 2>&1 && log "Reset compilation $PKG"
+    cmd package compile -m verify -f "$PKG" >/dev/null 2>&1 && log "Set verify mode $PKG"
 }
 
 until ls /data/app/*/${PKG}* >/dev/null 2>&1; do
