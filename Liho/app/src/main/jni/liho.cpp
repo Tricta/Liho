@@ -62,55 +62,53 @@ static std::string find_lib_path(const char* libname) {
 }
 
 void initialize_hooking_framework() {
-    if (!registeredDexHooks.empty()) {
-        std::string libart_path = find_lib_path("libart.so");
-        if (libart_path.empty()) {
-            LOGE("libart.so not found in /proc/self/maps");
-            return;
-        }
+    std::string libart_path = find_lib_path("libart.so");
+    if (libart_path.empty()) {
+        LOGE("libart.so not found in /proc/self/maps");
+        return;
+    }
 
-        auto sym = [&](const char *name) -> void * {
-            void *s = DobbySymbolResolver(libart_path.c_str(), name);
-            if (!s) LOGE("cannot find symbol %s", name);
-            return s;
-        };
+    auto sym = [&](const char *name) -> void * {
+        void *s = DobbySymbolResolver(libart_path.c_str(), name);
+        if (!s) LOGE("cannot find symbol %s", name);
+        return s;
+    };
 
-        void *prettyMethodSym = sym("_ZN3art9ArtMethod12PrettyMethodEPS0_b");
-        if (!prettyMethodSym) return;
-        g_orig.PrettyMethod = (PrettyMethod_fn)prettyMethodSym;
+    void *prettyMethodSym = sym("_ZN3art9ArtMethod12PrettyMethodEPS0_b");
+    if (!prettyMethodSym) return;
+    g_orig.PrettyMethod = (PrettyMethod_fn)prettyMethodSym;
 
-        void *invokeSym = sym("_ZN3art9ArtMethod6InvokeEPNS_6ThreadEPjjPNS_6JValueEPKc");
-        if (!invokeSym) return;
-        if (DobbyHook(invokeSym, (void *)hooked_Invoke, (void **)&g_orig.Invoke) != 0)
-            LOGE("Invoke hook failed.");
+    void *invokeSym = sym("_ZN3art9ArtMethod6InvokeEPNS_6ThreadEPjjPNS_6JValueEPKc");
+    if (!invokeSym) return;
+    if (DobbyHook(invokeSym, (void *)hooked_Invoke, (void **)&g_orig.Invoke) != 0)
+        LOGE("Invoke hook failed.");
 
-        void *quickToInterpSym = sym("artQuickToInterpreterBridge");
-        if (!quickToInterpSym) return;
-        if (DobbyHook(quickToInterpSym, (void *)hook_artQuickToInterpreterBridge, (void **)&g_orig.artQuickToInterpreterBridge) != 0)
-            LOGE("quickToInterpreterAddr hook failed.");
+    void *quickToInterpSym = sym("artQuickToInterpreterBridge");
+    if (!quickToInterpSym) return;
+    if (DobbyHook(quickToInterpSym, (void *)hook_artQuickToInterpreterBridge, (void **)&g_orig.artQuickToInterpreterBridge) != 0)
+        LOGE("quickToInterpreterAddr hook failed.");
 
-        void *fastInterpToInterpInvokeSym = sym("_ZN3art11interpreter37UseFastInterpreterToInterpreterInvokeEPNS_9ArtMethodE");
-        if (!fastInterpToInterpInvokeSym) return;
-        if (DobbyHook(fastInterpToInterpInvokeSym, (void *)hook_fastInterpToInterpInvoke, (void **)&g_orig.fastInterpToInterpInvoke) != 0)
-            LOGE("fastInterpToInterpInvoke hook failed.");
+    void *fastInterpToInterpInvokeSym = sym("_ZN3art11interpreter37UseFastInterpreterToInterpreterInvokeEPNS_9ArtMethodE");
+    if (!fastInterpToInterpInvokeSym) return;
+    if (DobbyHook(fastInterpToInterpInvokeSym, (void *)hook_fastInterpToInterpInvoke, (void **)&g_orig.fastInterpToInterpInvoke) != 0)
+        LOGE("fastInterpToInterpInvoke hook failed.");
 
-        const char *doCallSymbols[4] = {
-            "_ZN3art11interpreter6DoCallILb0ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
-            "_ZN3art11interpreter6DoCallILb0ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
-            "_ZN3art11interpreter6DoCallILb1ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
-            "_ZN3art11interpreter6DoCallILb1ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE"
-        };
-        void *trampolines[4] = {
-            (void *)hooked_doCall_0, (void *)hooked_doCall_1,
-            (void *)hooked_doCall_2, (void *)hooked_doCall_3
-        };
+    const char *doCallSymbols[4] = {
+        "_ZN3art11interpreter6DoCallILb0ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
+        "_ZN3art11interpreter6DoCallILb0ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
+        "_ZN3art11interpreter6DoCallILb1ELb0EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE",
+        "_ZN3art11interpreter6DoCallILb1ELb1EEEbPNS_9ArtMethodEPNS_6ThreadERNS_11ShadowFrameEPKNS_11InstructionEtPNS_6JValueE"
+    };
+    void *trampolines[4] = {
+        (void *)hooked_doCall_0, (void *)hooked_doCall_1,
+        (void *)hooked_doCall_2, (void *)hooked_doCall_3
+    };
 
-        for (int i = 0; i < 4; ++i) {
-            void *doCallSym = sym(doCallSymbols[i]);
-            if (!doCallSym) continue;
-            if (DobbyHook(doCallSym, trampolines[i], (void **)&g_orig.doCall[i]) != 0)
-                LOGE("doCall hook failed for: %s", doCallSymbols[i]);
-        }
+    for (int i = 0; i < 4; ++i) {
+        void *doCallSym = sym(doCallSymbols[i]);
+        if (!doCallSym) continue;
+        if (DobbyHook(doCallSym, trampolines[i], (void **)&g_orig.doCall[i]) != 0)
+            LOGE("doCall hook failed for: %s", doCallSymbols[i]);
     }
 
     if (!registeredNativeHooks.empty()) {
