@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-PKG="com.example.dummy3"
+PKG="com.example.hookingdemo"
 LOG_TAG="liho"
 
 log() {
@@ -22,7 +22,4 @@ until ls /data/app/*/${PKG}* >/dev/null 2>&1; do
     sleep 2
 done
 
-while true; do
-    cleanup
-    sleep 3
-done
+cleanup

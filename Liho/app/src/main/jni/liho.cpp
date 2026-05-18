@@ -2,7 +2,8 @@
 
 #include "global.h"
 #include "Hooking/artHooking.h"
-#include "dobby/dobby.h"
+#include "dobby.h"
+#include "xhook.h"
 #include "Utils/logUtils.h"
 #include <cstdio>
 #include <cstring>
@@ -13,6 +14,8 @@ std::string LOGFILTER;
 
 static std::vector<DexHookTarget> registeredDexHooks;
 static std::vector<NativeHookTarget> registeredNativeHooks;
+
+static DlopenHookMethod g_dlopen_hook_method = DlopenHookMethod::INLINE;
 
 ArtOrigs g_orig;
 
@@ -30,6 +33,10 @@ void register_native_hook(const char* libName, const char* symbolName, void* hoo
 
 const std::vector<NativeHookTarget>& get_registered_native_hooks() {
     return registeredNativeHooks;
+}
+
+void set_dlopen_hook_method(DlopenHookMethod method) {
+    g_dlopen_hook_method = method;
 }
 
 void set_apk_name(const char* name) {
@@ -112,12 +119,19 @@ void initialize_hooking_framework() {
     }
 
     if (!registeredNativeHooks.empty()) {
-        void *sym = DobbySymbolResolver(nullptr, "android_dlopen_ext");
-        if (sym) {
-            if (DobbyHook(sym, (void *)hooked_android_dlopen_ext, (void **)&orig_android_dlopen_ext) != 0)
-                LOGE("Failed to hook android_dlopen_ext");
+        if (g_dlopen_hook_method == DlopenHookMethod::PLT) {
+            xhook_register(".*\\.so$", "android_dlopen_ext",
+                    (void *)hooked_android_dlopen_ext, (void **)&orig_android_dlopen_ext);
+            if (xhook_refresh(0) != 0)
+                LOGE("Failed to PLT hook android_dlopen_ext");
         } else {
-            LOGE("Failed to resolve android_dlopen_ext symbol");
+            void *dlopenSym = DobbySymbolResolver(nullptr, "android_dlopen_ext");
+            if (dlopenSym) {
+                if (DobbyHook(dlopenSym, (void *)hooked_android_dlopen_ext, (void **)&orig_android_dlopen_ext) != 0)
+                    LOGE("Failed to inline hook android_dlopen_ext");
+            } else {
+                LOGE("Failed to resolve android_dlopen_ext symbol");
+            }
         }
     }
 }

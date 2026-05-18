@@ -19,6 +19,8 @@ struct DexHookTarget {
     std::string dexFile;
 };
 
+enum class DlopenHookMethod { INLINE, PLT };
+
 extern const char* APK_NAME;
 extern bool DEBUG;
 extern std::string LOGFILTER;
@@ -33,3 +35,4 @@ void initialize_hooking_framework();
 void set_apk_name(const char* name);
 void set_debug_enabled(bool enabled);
 void set_log_filter(const std::string& filter);
+void set_dlopen_hook_method(DlopenHookMethod method);

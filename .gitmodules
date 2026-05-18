@@ -1,0 +1,6 @@
+[submodule "Liho/app/src/main/jni/dobby"]
+	path = Liho/app/src/main/jni/dobby
+	url = https://github.com/jmpews/Dobby.git
+[submodule "Liho/app/src/main/jni/xhook"]
+	path = Liho/app/src/main/jni/xhook
+	url = https://github.com/iqiyi/xHook.git
