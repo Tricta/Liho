@@ -36,3 +36,4 @@ void set_apk_name(const char* name);
 void set_debug_enabled(bool enabled);
 void set_log_filter(const std::string& filter);
 void set_dlopen_hook_method(DlopenHookMethod method);
+DlopenHookMethod get_dlopen_hook_method();

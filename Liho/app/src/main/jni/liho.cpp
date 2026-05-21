@@ -39,6 +39,10 @@ void set_dlopen_hook_method(DlopenHookMethod method) {
     g_dlopen_hook_method = method;
 }
 
+DlopenHookMethod get_dlopen_hook_method() {
+    return g_dlopen_hook_method;
+}
+
 void set_apk_name(const char* name) {
     APK_NAME = name;
 }
