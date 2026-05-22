@@ -32,6 +32,8 @@
 
 Liho hooks Android system components like libart.so and libdl.so to enable instrumentation of both DEX and native code of applications via zygote injection.
 
+The zygote is the first process started on Android, acting as a template or interface for the creation of other processes. Due to its elevated privileges, it can interact with any application, unlike the highly restricted communication between apps enforced by the system's SELinux policies. This makes it an interesting target for sandbox evasion, enabling hooking techniques in Dex code (Java/Kotlin) and native code (C/C++/Rust), which have proven to be extremely effective from a defense evasion perspective.
+
 This approach stealthily bypasses Frida, Xposed and debugger detections, traces method calls during app forks via ShadowFrames and ArtMethods, and help to quick reversing and bypass protections.
 
 Liho intercepts every ART entry point (`DoCall`, `artQuickToInterpreterBridge`, `ArtMethod::Invoke`) and prints a `ShadowFrame` call tree on each `DoCall`, so every DEX method executed by the target is logged without needing a specific hook target. Native hooks support both **inline** (Dobby) and **PLT** (xhook) strategies.
