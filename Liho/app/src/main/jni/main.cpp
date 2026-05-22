@@ -6,7 +6,8 @@
 using zygisk::Api;
 using zygisk::AppSpecializeArgs;
 
-int64_t (*orig_nativeFunc)(char*) = nullptr;
+int64_t (*orig_isAdbEnabled)() = nullptr;
+void (*orig_jwdpDetect)() = nullptr;
 
 class Liho : public zygisk::ModuleBase {
 public:
@@ -18,9 +19,9 @@ public:
     void postAppSpecialize(const AppSpecializeArgs *args) override {
         const char *packageNameChars = env->GetStringUTFChars(args->nice_name, nullptr);
 
-        set_apk_name("com.example.dummy3");
+        set_apk_name("com.example.hookingdemo");
         set_debug_enabled(true);
-        set_log_filter("com.example.dummy3");
+        set_log_filter("com.example.hookingdemo");
 
         if (strcmp(packageNameChars, APK_NAME) == 0) {
             LOGI("find process: %s", APK_NAME);
@@ -28,12 +29,22 @@ public:
                 this->env->GetJavaVM(&g_vm);
             }
 
-            register_dex_hook("com.example.dummy3.MainActivity.isRoot", 
-                "com.example.dummy3.mydex", "isRoot", "()Ljava/lang/Boolean;","mydex.dex");
+            register_dex_hook("com.example.hookingdemo.MainActivity.isDebuggable", 
+                "com.example.hookingdemo.Bypass", "isDebuggable", "(Landroid/content/Context;)Z","Bypass.dex");
+            
+            register_dex_hook("com.example.hookingdemo.MainActivity.isEmulator", 
+                "com.example.hookingdemo.Bypass", "isEmulator", "()Z","Bypass.dex");
 
-            register_native_hook("libdummy3.so",
-                "Java_com_example_dummy3_MainActivity_stringFromNativeCode", 
-                (void*)hooked_nativeFunc, (void**)&orig_nativeFunc);
+            register_dex_hook("com.example.hookingdemo.MainActivity.dynamicText", 
+                "com.example.hookingdemo.Bypass", "dynamicText", "()Ljava/lang/String;","Bypass.dex");
+
+            set_dlopen_hook_method(DlopenHookMethod::INLINE);
+
+            register_native_hook("libhookingdemo.so", "Java_com_example_hookingdemo_MainActivity_isAdbEnabled", 
+                (void*)hooked_isAdbEnabled, (void**)&orig_isAdbEnabled);
+
+            register_native_hook("libhookingdemo.so", "Java_com_example_hookingdemo_MainActivity_jwdpDetect", 
+                (void*)hooked_jwdpDetect, (void**)&orig_jwdpDetect);
 
             initialize_hooking_framework();
         }
@@ -45,12 +56,14 @@ private:
     Api *api;
     JNIEnv *env;
 
-    static int64_t hooked_nativeFunc(char* arg1) {
-        JNIEnv* env = GetEnv();
-        if (env == nullptr) return (int64_t)orig_nativeFunc(arg1);
+    static int64_t hooked_isAdbEnabled() {
+        LOGI("Bypassing isAdbEnabled...");
+        return false;
+    }
 
-        jstring hackedStr = env->NewStringUTF("Hacked");
-        return reinterpret_cast<int64_t>(hackedStr);
+    static void hooked_jwdpDetect() {
+        LOGI("Bypassing jwdpDetect...");
+        return;
     }
 };
 
